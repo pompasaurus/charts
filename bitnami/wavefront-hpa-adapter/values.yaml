@@ -5,27 +5,28 @@
 ## @section Global parameters
 ## @param global.imageRegistry Global Docker image registry
 ## @param global.imagePullSecrets Global Docker registry secret names as an array
+## @param global.storageClass Global StorageClass for Persistent Volume(s)
 ##
 global:
-  imageRegistry:
+  imageRegistry: ""
   imagePullSecrets: []
-#     - myRegistryKeySecretName
-#   storageClass: myStorageClass
+  #     - myRegistryKeySecretName
+  storageClass: ""
 
 ## Override Kubernetes version
 ## @param kubeVersion Override Kubernetes version
 ##
-kubeVersion:
+kubeVersion: ""
 
 ## String to partially override common.names.fullname template (will maintain the release name)
 ## @param nameOverride String to partially override common.names.fullname
 ##
-nameOverride:
+nameOverride: ""
 
 ## String to fully override common.names.fullname template
 ## @param fullnameOverride String to fully override common.names.fullname
 ##
-fullnameOverride:
+fullnameOverride: ""
 
 ## Add labels to all the deployed resources
 ## @param commonLabels  Labels to add to all deployed objects
@@ -58,10 +59,10 @@ image:
   repository: bitnami/wavefront-hpa-adapter
   ## @param image.tag Adapter image tag (immutabe tags are recommended)
   ##
-  tag: 0.9.8-scratch-r2
+  tag: 0.9.8-scratch-r9
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-  ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+  ## ref: https://kubernetes.io/docs/user-guide/images/#pre-pulling-images
   ##
   ## @param image.pullPolicy Adapter image pull policy
   ##
@@ -109,6 +110,20 @@ readinessProbe:
   periodSeconds: 10
   successThreshold: 1
   timeoutSeconds: 1
+## @param startupProbe.enabled Enable startupProbe
+## @param startupProbe.initialDelaySeconds Initial delay seconds for startupProbe
+## @param startupProbe.periodSeconds Period seconds for startupProbe
+## @param startupProbe.timeoutSeconds Timeout seconds for startupProbe
+## @param startupProbe.failureThreshold Failure threshold for startupProbe
+## @param startupProbe.successThreshold Success threshold for startupProbe
+##
+startupProbe:
+  enabled: false
+  failureThreshold: 3
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 1
 
 ## Command and args for running the container (set to default if not set). Use array form
 ## @param command Override default container command (useful when using custom images)
@@ -126,7 +141,7 @@ args: []
 hostAliases: []
 
 ## wavefront-hpa-adapter resource requests and limits
-## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+## ref: https://kubernetes.io/docs/user-guide/compute-resources/
 ##
 resources:
   # We usually recommend not to specify default resources and to leave this as a conscious
@@ -245,15 +260,31 @@ priorityClassName: ""
 ##
 lifecycleHooks: {}
 
+## @param schedulerName Alternative scheduler
+## ref: https://kubernetes.io/docs/tasks/administer-cluster/configure-multiple-schedulers/
+##
+schedulerName: ""
+
+## @param topologySpreadConstraints Topology Spread Constraints for pod assignment
+## https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+## The value is evaluated as a template
+##
+topologySpreadConstraints: []
+
 ## Custom Liveness probes for wavefront-hpa-adapter
 ## @param customLivenessProbe  Override default liveness probe
 ##
 customLivenessProbe: {}
 
-## Custom Rediness probes wavefront-hpa-adapter
+## Custom Readiness probes wavefront-hpa-adapter
 ## @param customReadinessProbe  Override default readiness probe
 ##
 customReadinessProbe: {}
+
+## Custom Startup probes wavefront-hpa-adapter
+## @param customStartupProbe  Override default startup probe
+##
+customStartupProbe: {}
 
 ## Update strategy - only really applicable for deployments with RWO PVs attached
 ## If replicas = 1, an update can get "stuck", as the previous pod remains attached to the
@@ -265,9 +296,10 @@ updateStrategy:
   type: RollingUpdate
 
 ## Adapter Container port
-## @param containerPort Adapter container port
+## @param containerPorts.https Adapter container port
 ##
-containerPort: 6443
+containerPorts:
+  https: 6443
 ## Additional environment variables to set
 ## Example:
 ## extraEnvVars:
@@ -280,12 +312,12 @@ extraEnvVars: []
 ## ConfigMap with extra environment variables
 ## @param extraEnvVarsCM Name of existing ConfigMap containing extra env vars
 ##
-extraEnvVarsCM:
+extraEnvVarsCM: ""
 
 ## Secret with extra environment variables
 ## @param extraEnvVarsSecret Name of existing Secret containing extra env vars
 ##
-extraEnvVarsSecret:
+extraEnvVarsSecret: ""
 
 ## Extra volumes to add to the deployment
 ## @param extraVolumes  Optionally specify extra list of additional volumes for Adapter pods
@@ -308,7 +340,7 @@ extraVolumeMounts: []
 ##         containerPort: 1234
 ## @param initContainers  Add additional init containers to the Adapter pods
 ##
-initContainers: {}
+initContainers: []
 
 ## Add sidecars to the wavefront-hpa-adapter pods.
 ## Example:
@@ -322,7 +354,7 @@ initContainers: {}
 ##
 ## @param sidecars  Add additional sidecar containers to the Adapter pod
 ##
-sidecars: {}
+sidecars: []
 
 ## Adapter prefix parameter
 ## @param adapterMetricPrefix Adapter metric `prefix` parameter
@@ -357,7 +389,7 @@ adapterSSLCertDir: "/etc/ssl/certs"
 ## Adapter SSL certs secrets
 ## @param adapterSSLCertsSecret Adapter SSL Certs secret (will use autogenerated if empty)
 ##
-adapterSSLCertsSecret:
+adapterSSLCertsSecret: ""
 
 ## External wavefront settings
 ##
@@ -377,18 +409,35 @@ service:
   ##
   type: ClusterIP
   ## HTTP Port
-  ## @param service.port Adapter service port
+  ## @param service.ports.https Adapter service port
   ##
-  port: 443
+  ports:
+    https: 443
+  ## @param service.clusterIP WordPress service Cluster IP
+  ## e.g.:
+  ## clusterIP: None
+  ##
+  clusterIP: ""
+  ## @param service.annotations Additional custom annotations for WordPress service
+  ##
+  annotations: {}
+  ## @param service.extraPorts Extra port to expose on WordPress service
+  ##
+  extraPorts: []
+
   ## loadBalancerIP for the Service (optional, cloud specific)
-  ## ref: http://kubernetes.io/docs/user-guide/services/#type-loadbalancer
+  ## ref: https://kubernetes.io/docs/user-guide/services/#type-loadbalancer
   ## @param service.loadBalancerIP Adapter service LoadBalancer IP
   ##
-  loadBalancerIP:
+  loadBalancerIP: ""
   ## loadBalancerIP source ranges for the Service
   ## @param service.loadBalancerSourceRanges loadBalancerIP source ranges for the Service
+  ## https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
+  ## e.g.
+  ## loadBalancerSourceRanges:
+  ##   - 10.10.10.0/24
   ##
-  loadBalancerSourceRanges:
+  loadBalancerSourceRanges: []
   ##
   ## nodePorts:
   ##   http: <to set explicitly, choose port between 30000-32767>
@@ -398,7 +447,7 @@ service:
   nodePorts:
     http: ""
   ## Enable client source IP preservation
-  ## ref http://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+  ## ref https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
   ## @param service.externalTrafficPolicy External traffic policy for the service
   ##
   externalTrafficPolicy: Cluster
@@ -419,7 +468,13 @@ serviceAccount:
   ## The name of the ServiceAccount to use.
   ## If not set and create is true, a name is generated using the fullname template
   ##
-  name:
+  name: ""
+  ## @param serviceAccount.automountServiceAccountToken Automount API credentials for a service account.
+  ##
+  automountServiceAccountToken: true
+  ## @param serviceAccount.annotations Add annotations to the service account
+  ##
+  annotations: {}
 
 ## Specifies if the API Services should be registered in the Kubernetes API
 ## @param apiService.create Create the APIService objects in Kubernetes API

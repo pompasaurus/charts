@@ -22,13 +22,6 @@ Return the proper image name (for the metrics image)
 {{- end -}}
 
 {{/*
-Return the proper image name (for the metrics image)
-*/}}
-{{- define "redis.metrics.sentinel.image" -}}
-{{ include "common.images.image" (dict "imageRoot" .Values.metrics.sentinel.image "global" .Values.global) }}
-{{- end -}}
-
-{{/*
 Return the proper image name (for the init container volume-permissions image)
 */}}
 {{- define "redis.volumePermissions.image" -}}
@@ -46,7 +39,7 @@ Return sysctl image
 Return the proper Docker Image Registry Secret Names
 */}}
 {{- define "redis.imagePullSecrets" -}}
-{{- include "common.images.pullSecrets" (dict "images" (list .Values.image .Values.sentinel.image .Values.metrics.image .Values.metrics.sentinel.image .Values.volumePermissions.image .Values.sysctl.image) "global" .Values.global) -}}
+{{- include "common.images.pullSecrets" (dict "images" (list .Values.image .Values.sentinel.image .Values.metrics.image .Values.volumePermissions.image .Values.sysctl.image) "global" .Values.global) -}}
 {{- end -}}
 
 {{/*
@@ -68,17 +61,6 @@ Return the appropriate apiGroup for PodSecurityPolicy.
 {{- print "policy" -}}
 {{- else -}}
 {{- print "extensions" -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Return the appropriate apiVersion for PodSecurityPolicy.
-*/}}
-{{- define "podSecurityPolicy.apiVersion" -}}
-{{- if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
-{{- print "policy/v1beta1" -}}
-{{- else -}}
-{{- print "extensions/v1beta1" -}}
 {{- end -}}
 {{- end -}}
 
@@ -188,7 +170,7 @@ Get the password secret.
 {{- end -}}
 
 {{/*
-Get the password key to be retrieved from Redis(TM) secret.
+Get the password key to be retrieved from Redis&trade; secret.
 */}}
 {{- define "redis.secretPasswordKey" -}}
 {{- if and .Values.auth.existingSecret .Values.auth.existingSecretPasswordKey -}}
@@ -198,8 +180,23 @@ Get the password key to be retrieved from Redis(TM) secret.
 {{- end -}}
 {{- end -}}
 
+
 {{/*
-Return Redis(TM) password
+Returns the available value for certain key in an existing secret (if it exists),
+otherwise it generates a random value.
+*/}}
+{{- define "getValueFromSecret" }}
+    {{- $len := (default 16 .Length) | int -}}
+    {{- $obj := (lookup "v1" "Secret" .Namespace .Name).data -}}
+    {{- if $obj }}
+        {{- index $obj .Key | b64dec -}}
+    {{- else -}}
+        {{- randAlphaNum $len -}}
+    {{- end -}}
+{{- end }}
+
+{{/*
+Return Redis&trade; password
 */}}
 {{- define "redis.password" -}}
 {{- if not (empty .Values.global.redis.password) }}
@@ -207,7 +204,7 @@ Return Redis(TM) password
 {{- else if not (empty .Values.auth.password) -}}
     {{- .Values.auth.password -}}
 {{- else -}}
-    {{- randAlphaNum 10 -}}
+    {{- include "getValueFromSecret" (dict "Namespace" .Release.Namespace "Name" (include "common.names.fullname" .) "Length" 10 "Key" "redis-password")  -}}
 {{- end -}}
 {{- end -}}
 
@@ -223,7 +220,7 @@ Compile all warnings into a single message, and call fail.
 */}}
 {{- define "redis.validateValues" -}}
 {{- $messages := list -}}
-{{- $messages := append $messages (include "redis.validateValues.spreadConstraints" .) -}}
+{{- $messages := append $messages (include "redis.validateValues.topologySpreadConstraints" .) -}}
 {{- $messages := append $messages (include "redis.validateValues.architecture" .) -}}
 {{- $messages := append $messages (include "redis.validateValues.podSecurityPolicy.create" .) -}}
 {{- $messages := append $messages (include "redis.validateValues.tls" .) -}}
@@ -235,16 +232,16 @@ Compile all warnings into a single message, and call fail.
 {{- end -}}
 {{- end -}}
 
-{{/* Validate values of Redis(TM) - spreadConstrainsts K8s version */}}
-{{- define "redis.validateValues.spreadConstraints" -}}
-{{- if and (semverCompare "<1.16-0" .Capabilities.KubeVersion.GitVersion) .Values.replica.spreadConstraints -}}
-redis: spreadConstraints
+{{/* Validate values of Redis&trade; - spreadConstrainsts K8s version */}}
+{{- define "redis.validateValues.topologySpreadConstraints" -}}
+{{- if and (semverCompare "<1.16-0" .Capabilities.KubeVersion.GitVersion) .Values.replica.topologySpreadConstraints -}}
+redis: topologySpreadConstraints
     Pod Topology Spread Constraints are only available on K8s  >= 1.16
     Find more information at https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
 {{- end -}}
 {{- end -}}
 
-{{/* Validate values of Redis(TM) - must provide a valid architecture */}}
+{{/* Validate values of Redis&trade; - must provide a valid architecture */}}
 {{- define "redis.validateValues.architecture" -}}
 {{- if and (ne .Values.architecture "standalone") (ne .Values.architecture "replication") -}}
 redis: architecture
@@ -259,7 +256,7 @@ redis: architecture
 {{- end -}}
 {{- end -}}
 
-{{/* Validate values of Redis(TM) - PodSecurityPolicy create */}}
+{{/* Validate values of Redis&trade; - PodSecurityPolicy create */}}
 {{- define "redis.validateValues.podSecurityPolicy.create" -}}
 {{- if and .Values.podSecurityPolicy.create (not .Values.podSecurityPolicy.enabled) }}
 redis: podSecurityPolicy.create
@@ -268,7 +265,7 @@ redis: podSecurityPolicy.create
 {{- end -}}
 {{- end -}}
 
-{{/* Validate values of Redis(TM) - TLS enabled */}}
+{{/* Validate values of Redis&trade; - TLS enabled */}}
 {{- define "redis.validateValues.tls" -}}
 {{- if and .Values.tls.enabled (not .Values.tls.autoGenerated) (not .Values.tls.existingSecret) (not .Values.tls.certificatesSecret) }}
 redis: tls.enabled

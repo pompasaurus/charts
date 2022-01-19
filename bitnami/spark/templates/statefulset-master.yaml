@@ -34,6 +34,7 @@ spec:
       {{- end }}
     spec:
       {{- include "spark.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ template "spark.serviceAccountName" . }}
       {{- if .Values.master.affinity }}
       affinity: {{- include "common.tplvalues.render" (dict "value" .Values.master.affinity "context" $) | nindent 8 }}
       {{- else }}
@@ -136,8 +137,16 @@ spec:
         - name: spark-master
           image: {{ include "spark.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          {{- if .Values.diagnosticMode.enabled }}
+          command: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.command "context" $) | nindent 12 }}
+          args: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.args "context" $) | nindent 12 }}
+          {{- end }}
           ports:
+            {{- if .Values.security.ssl.enabled }}
+            - name: https
+            {{- else }}
             - name: http
+            {{- end }}
               containerPort: {{ .Values.master.webPort }}
               protocol: TCP
             - name: cluster
@@ -156,16 +165,14 @@ spec:
             {{- tpl (toYaml .Values.master.extraVolumeMounts) $ | nindent 12 }}
             {{- end }}
           env:
+            - name: BITNAMI_DEBUG
+              value: {{ ternary "true" "false" (or .Values.image.debug .Values.diagnosticMode.enabled) | quote }}
             - name: SPARK_MODE
               value: "master"
-            {{- if .Values.master.debug }}
-            - name: BASH_DEBUG
-              value: {{ ternary "1" "0" .Values.image.debug | quote }}
-            {{- end }}
             {{- if .Values.metrics.enabled }}
             - name: SPARK_METRICS_ENABLED
               value: "true"
-            {{- end}}
+            {{- end }}
             - name: SPARK_DAEMON_MEMORY
               value: {{ .Values.master.daemonMemoryLimit | quote }}
             {{- if .Values.master.clusterPort }}
@@ -223,6 +230,7 @@ spec:
             {{- if .Values.master.extraEnvVars }}
             {{- toYaml .Values.master.extraEnvVars | nindent 12 }}
             {{- end }}
+          {{- if not .Values.diagnosticMode.enabled }}
           {{- if .Values.master.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
@@ -244,6 +252,7 @@ spec:
             timeoutSeconds: {{ .Values.master.readinessProbe.timeoutSeconds }}
             successThreshold: {{ .Values.master.readinessProbe.successThreshold }}
             failureThreshold: {{ .Values.master.readinessProbe.failureThreshold }}
+          {{- end }}
           {{- end }}
           {{- if .Values.master.resources }}
           resources: {{- toYaml .Values.master.resources | nindent 12 }}

@@ -3,8 +3,20 @@
 {{/*
 Return the proper Fluentd image name
 */}}
-{{- define "fluentd.image" -}}
-{{ include "common.images.image" (dict "imageRoot" .Values.image "global" .Values.global) }}
+{{- define "fluentd.forwarder.image" -}}
+{{- $registryName := default .Values.image.registry .Values.forwarder.image.registry -}}
+{{- $repositoryName := default .Values.image.repository .Values.forwarder.image.repository -}}
+{{- $tag := default .Values.image.tag .Values.forwarder.image.tag -}}
+{{- $imageRoot := dict "registry" $registryName "repository" $repositoryName "tag" $tag -}}
+{{ include "common.images.image" (dict "imageRoot" $imageRoot "global" .Values.global) }}
+{{- end -}}
+
+{{- define "fluentd.aggregator.image" -}}
+{{- $registryName := default .Values.image.registry .Values.aggregator.image.registry -}}
+{{- $repositoryName := default .Values.image.repository .Values.aggregator.image.repository -}}
+{{- $tag := default .Values.image.tag .Values.aggregator.image.tag -}}
+{{- $imageRoot := dict "registry" $registryName "repository" $repositoryName "tag" $tag -}}
+{{ include "common.images.image" (dict "imageRoot" $imageRoot "global" .Values.global) }}
 {{- end -}}
 
 {{/*
@@ -52,7 +64,6 @@ Validate data
 {{- $messages := append $messages (include "fluentd.validateValues.deployment" .) -}}
 {{- $messages := append $messages (include "fluentd.validateValues.ingress" .) -}}
 {{- $messages := append $messages (include "fluentd.validateValues.rbac" .) -}}
-{{- $messages := append $messages (include "fluentd.validateValues.serviceAccount" .) -}}
 {{- $messages := append $messages (include "fluentd.validateValues.tls" .) -}}
 {{- $messages := without $messages "" -}}
 {{- $message := join "\n" $messages -}}
@@ -72,7 +83,7 @@ fluentd:
 
 {{/* Validate values of Fluentd - if the aggregator index is enabled there must be a port named http in the service */}}
 {{- define "fluentd.validateValues.ingress" -}}
-{{- if and .Values.aggregator.enabled .Values.aggregator.ingress.enabled (not .Values.aggregator.service.ports.http)}}
+{{- if and .Values.aggregator.enabled .Values.aggregator.ingress.enabled (not .Values.aggregator.service.ports.http) }}
 fluentd:
     You have enabled the Ingress for the aggregator. The aggregator service needs to have a port named http for the Ingress to work.
     Please, define it in your `values.yaml` file. For example:
@@ -91,47 +102,24 @@ fluentd:
 
 {{/* Validate values of Fluentd - must create serviceAccount to create enable RBAC */}}
 {{- define "fluentd.validateValues.rbac" -}}
-{{- if not (typeIs "<nil>" .Values.rbac.create) -}}
-fluentd: rbac.create
-    Top-level rbac configuration has been removed, as it only applied to the forwarder.
-    Please migrate to forwarder.rbac.create
-{{- end -}}
+{{- $pspAvailable := (semverCompare "<1.25-0" (include "common.capabilities.kubeVersion" .)) -}}
 {{- if and .Values.forwarder.rbac.create (not .Values.forwarder.serviceAccount.create) }}
 fluentd: forwarder.rbac.create
     A ServiceAccount is required ("forwarder.rbac.create=true" is set)
     Please create a ServiceAccount (--set serviceAccount.forwarder.create=true)
 {{- end -}}
-{{- if and .Values.forwarder.rbac.pspEnabled (not .Values.forwarder.rbac.create) }}
+{{- if and $pspAvailable .Values.forwarder.rbac.pspEnabled (not .Values.forwarder.rbac.create) }}
 fluentd: forwarder.rbac.pspEnabled
     Enabling PSP requires RBAC to be created ("forwarder.rbac.create=true" is set)
     Please enable RBAC, or disable creation of PSP (--set forwarder.rbac.create=true) or (--set forwarder.rbac.pspEnabled=false)
 {{- end -}}
-{{- if and .Values.forwarder.rbac.pspEnabled (not .Values.forwarder.securityContext.enabled) }}
+{{- if and $pspAvailable .Values.forwarder.rbac.pspEnabled (not .Values.forwarder.podSecurityContext.enabled) }}
 fluentd: forwarder.rbac.pspEnabled
-    Enabling PSP requires enabling forwarder pod security context ("forwarder.securityContext.enabled=true")
+    Enabling PSP requires enabling forwarder pod security context ("forwarder.podSecurityContext.enabled=true")
 {{- end -}}
-{{- if and .Values.forwarder.rbac.pspEnabled (not .Values.forwarder.containerSecurityContext.enabled) }}
+{{- if and $pspAvailable .Values.forwarder.rbac.pspEnabled (not .Values.forwarder.containerSecurityContext.enabled) }}
 fluentd: forwarder.rbac.pspEnabled
     Enabling PSP requires enabling forwarder container security context ("forwarder.containerSecurityContext.enabled=true")
-{{- end -}}
-{{- end -}}
-
-{{/* Validate values of Fluentd - prefer per component serviceAccounts to top-level definition */}}
-{{- define "fluentd.validateValues.serviceAccount" -}}
-{{- if not (typeIs "<nil>" .Values.serviceAccount.create) -}}
-fluentd: serviceAccount.create:
-    Top-level serviceAccount configuration has been removed, as it only applied to the forwarder.
-    Please migrate to forwarder.serviceAccount.create
-{{- end -}}
-{{- if .Values.serviceAccount.name }}
-fluentd: serviceAccount.name
-    Top-level serviceAccount configuration has been removed, as it only applied to the forwarder.
-    Please migrate to forwarder.serviceAccount.name
-{{- end -}}
-{{- if .Values.serviceAccount.annotations }}
-fluentd: serviceAccount.annotations
-    Top-level serviceAccount configuration has been removed, as it only applied to the forwarder.
-    Please migrate to forwarder.serviceAccount.annotations
 {{- end -}}
 {{- end -}}
 

@@ -1,3 +1,9 @@
+CHART NAME: {{ .Chart.Name }}
+CHART VERSION: {{ .Chart.Version }}
+APP VERSION: {{ .Chart.AppVersion }}
+
+** Please be patient while the chart is being deployed **
+
 {{- if or .Values.mariadb.enabled .Values.externalDatabase.host -}}
 
 {{- if empty (include "prestashop.host" .) -}}
@@ -47,14 +53,14 @@ host. To configure PrestaShop with the URL of your service:
 
   echo "Store URL: http://127.0.0.1:8080/"
   echo "Admin URL: http://127.0.0.1:8080/administration"
-  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "common.names.fullname" . }} 8080:{{ .Values.service.port }}
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "common.names.fullname" . }} 8080:{{ coalesce .Values.service.ports.http .Values.service.port }}
 
 {{- else }}
 
-{{- $port:=.Values.service.port | toString }}
+{{- $port:=(coalesce .Values.service.ports.http .Values.service.port) | toString }}
 
-  echo "Store URL: http://{{ include "prestashop.host" . }}{{- if ne $port "80" }}:{{ .Values.service.port }}{{ end }}/"
-  echo "Admin URL: http://{{ include "prestashop.host" . }}{{- if ne $port "80" }}:{{ .Values.service.port }}{{ end }}/administration"
+  echo "Store URL: http://{{ include "prestashop.host" . }}{{- if ne $port "80" }}:{{ coalesce .Values.service.ports.http .Values.service.port }}{{ end }}/"
+  echo "Admin URL: http://{{ include "prestashop.host" . }}{{- if ne $port "80" }}:{{ coalesce .Values.service.ports.http .Values.service.port }}{{ end }}/administration"
 
 {{- end }}
 
@@ -73,8 +79,6 @@ host. To configure PrestaShop with the URL of your service:
 
 This deployment will be incomplete until you configure PrestaShop with a resolvable database
 host. To configure PrestaShop to use and external database host:
-
-
 1. Complete your PrestaShop deployment by running:
 
 {{- if eq .Values.service.type "NodePort" }}
@@ -99,6 +103,8 @@ host. To configure PrestaShop to use and external database host:
 
 {{- include "common.warnings.rollingTag" .Values.image }}
 {{- include "common.warnings.rollingTag" .Values.metrics.image }}
+{{- include "common.warnings.rollingTag" .Values.volumePermissions.image }}
+{{- include "common.warnings.rollingTag" .Values.certificates.image }}
 
 {{- $passwordValidationErrors := list -}}
 {{- if not .Values.existingSecret -}}

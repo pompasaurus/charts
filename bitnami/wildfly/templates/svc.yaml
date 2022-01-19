@@ -32,19 +32,21 @@ spec:
   {{- end }}
   ports:
     - name: http
-      port: {{ .Values.service.port}}
+      port: {{ .Values.service.port }}
       targetPort: http
       {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) (not (empty .Values.service.nodePorts.http)) }}
       nodePort: {{ .Values.service.nodePorts.http }}
       {{- else if eq .Values.service.type "ClusterIP" }}
       nodePort: null
       {{- end }}
+    {{- if or (eq .Values.service.type "ClusterIP") .Values.exposeManagementConsole }}
     - name: mgmt
-      port: {{ .Values.service.mgmtPort}}
+      port: {{ .Values.service.mgmtPort }}
       targetPort: mgmt
       {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) (not (empty .Values.service.nodePorts.mgmt)) }}
       nodePort: {{ .Values.service.nodePorts.mgmt }}
       {{- else if eq .Values.service.type "ClusterIP" }}
       nodePort: null
       {{- end }}
+    {{- end }}
   selector: {{- include "common.labels.matchLabels" . | nindent 4 }}
